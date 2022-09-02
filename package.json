@@ -7,7 +7,6 @@
     "start": "tsc-watch --onSuccess \"node dist/index.js\" ",
     "build": "tsc --build",
     "clean": "tsc --build --clean",
-    "deploy": "./deploy.sh",
     "test": "jest"
   },
   "author": "",
