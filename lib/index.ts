@@ -24,6 +24,13 @@ interface HFlowOptions {
   returnOnly?: string
 }
 
+interface HFlowResult<T = any> {
+  args: Array<any>
+  results: Record<string, T>
+}
+
+type HFlowReturnType<T = any> = HFlowResult<T> | T | Record<string, T> | null
+
 export const flowPromise = (functions: Array<Function>): Function => {
   if (_.isEmpty(functions) || !_.isArray(functions))
     return () => {}
@@ -124,34 +131,45 @@ export const wrapHofPromise = (func: Function, args: any, options: WrapHofOption
   }
 }
 
-export const hFlow = (functions: any, options: HFlowOptions = {}) => {
-  return (...args: Array<any>) => {
-    const {
-      isReturnArgs = false,
-      returnOnly
-    } = options
+const createContext = (args: Array<any>): HFlowContext => ({
+  args,
+  results: {}
+})
 
+const processReturnValue = <T = any>(
+  context: HFlowResult<T>,
+  options: HFlowOptions
+): HFlowReturnType<T> => {
+  const { isReturnArgs, returnOnly } = options
+
+  if (!context) {
+    return null
+  }
+
+  if (isReturnArgs) {
+    return context
+  }
+
+  if (returnOnly) {
+    return context.results[returnOnly]
+  }
+
+  return context.results
+}
+
+export const hFlow = <T = any>(
+  functions: Function | Function[],
+  options: HFlowOptions = {}
+): (...args: Array<any>) => HFlowReturnType<T> => {
+  return (...args: Array<any>) => {
     const _functions = _.isFunction(functions) ? functions(...args) : functions
-    const __functions = _.map(_functions, (func) => checkContextExist(func))
+    const __functions = _.map(_functions, checkContextExist)
     const mergedFunction = _.flow(__functions)
     
-    const context: HFlowContext = {
-      args: args,
-      results: {}
-    }
-
+    const context = createContext(args)
     const _context = mergedFunction(context)
-
-    if (!_context)
-      return _context
     
-    if (isReturnArgs) {
-      return _context
-    } else if (returnOnly) {
-      return _context?.results[returnOnly]
-    } else {
-      return _context?.results || {}
-    }
+    return processReturnValue(_context, options)
   }
 }
 
@@ -162,15 +180,12 @@ export const hFlowPromise = (functions: any, options: HFlowOptions = {}) => {
         isReturnArgs = false,
         returnOnly
       } = options
-
+      
       const _functions = _.isFunction(functions) ? functions(...args) : functions
       const __functions = _.map(_functions, (func) => checkContextExist(func))
       const mergedFunction = flowPromise(__functions)
       
-      const context: HFlowContext = {
-        args: args,
-        results: {}
-      } 
+      const context = createContext(args)
 
       try {
         const _context = await mergedFunction(context)
